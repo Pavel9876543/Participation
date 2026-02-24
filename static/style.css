@@ -1,0 +1,244 @@
+/* =========================
+   RESET + BASE
+========================= */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f2f2f2;
+    color: #222;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 10px;
+}
+
+
+/* =========================
+   HEADERS
+========================= */
+h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 12px;
+}
+
+h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+
+/* =========================
+   LIST
+========================= */
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+
+/* =========================
+   CARD (SWIPE CONTAINER)
+========================= */
+.card {
+    position: relative;          /* важно */
+    overflow: hidden;            /* важно */
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+
+/* =========================
+   ACTIONS (HIDDEN)
+========================= */
+.card-actions {
+    position: absolute;          /* важно */
+    top: 0;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    background: #e9e9e9;
+}
+
+.card-actions button {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    background: #dcdcdc;
+}
+
+.card-actions button:active {
+    background: #c6c6c6;
+}
+
+
+/* =========================
+   CARD CONTENT (VISIBLE)
+========================= */
+.card-content {
+    position: relative;
+    z-index: 2;                  /* перекрывает actions */
+    width: 100%;
+    background: #ffffff;
+    display: grid;
+    grid-template-columns: 72px 1fr 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    transition: transform 0.25s ease;
+}
+
+/* swipe open */
+.card.open .card-content {
+    transform: translateX(-150px);
+}
+
+
+/* =========================
+   CELLS
+========================= */
+.cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+}
+
+
+/* =========================
+   DATE
+========================= */
+.cell.date {
+    font-weight: bold;
+    color: #1f4ed8;
+    white-space: nowrap;
+}
+
+.date-text {
+    white-space: nowrap;
+}
+
+.date-input {
+    font-size: 14px;
+    padding: 3px 4px;
+}
+
+
+/* =========================
+   PERSON
+========================= */
+.cell.person {
+    overflow: hidden;
+}
+
+.person-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.person-input {
+    width: 100%;
+    font-size: 15px;
+    padding: 4px 6px;
+}
+
+
+/* =========================
+   STATUS (+ / -)
+========================= */
+.cell.status {
+    justify-content: center;
+    font-weight: 800;
+    font-size: 22px;      /* увеличенный + / - */
+    line-height: 1;
+}
+
+.cell.status.plus {
+    color: #1e9b4b;
+}
+
+.cell.status.minus {
+    color: #d22c2c;
+}
+
+.status-text {
+    line-height: 1;
+}
+
+.status-select {
+    font-size: 15px;
+}
+
+
+/* =========================
+   ADD FORM
+========================= */
+.add-form {
+    margin-top: 20px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+.add-form form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.add-form input[type="text"],
+.add-form select {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1px solid #bbb;
+}
+
+.add-form button {
+    padding: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
+    background: #1f4ed8;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.add-form button:active {
+    background: #173aa8;
+}
+
+
+/* =========================
+   MOBILE SAFETY
+========================= */
+@media (max-width: 420px) {
+    .card-content {
+        grid-template-columns: 64px 1fr 40px;
+    }
+
+    .cell {
+        font-size: 15px;
+    }
+
+    .cell.status {
+        font-size: 20px;
+    }
+}
