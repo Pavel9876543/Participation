@@ -19,7 +19,12 @@
     <div class="list">
 
         {% for row in schedule %}
-        <div class="card" data-id="{{ row.id }}">
+        <div 
+            class="card"
+            data-id="{{ row.id }}"
+            data-status="{{ row.status or '' }}"
+            data-position="{{ row.position }}"
+        >
 
             <!-- СКРЫТЫЕ ДЕЙСТВИЯ (SWIPE) -->
             <div class="card-actions">
@@ -34,39 +39,57 @@
 
                 <!-- ДАТА -->
                 <div class="cell date">
-                    <span class="date-text">{{ row.date_fmt }}</span>
+
+                    <span class="date-text">
+                        {{ row.date_fmt }}
+                    </span>
+
                     <input
                         type="date"
                         class="date-input"
                         value="{{ row.date }}"
+                        data-id="{{ row.id }}"
                         hidden
                     >
+
                 </div>
 
                 <!-- ФИО -->
                 <div class="cell person">
-                    <span class="person-text">{{ row.person }}</span>
+
+                    <span class="person-text">
+                        {{ row.person }}
+                    </span>
+
                     <input
                         type="text"
                         class="person-input"
                         value="{{ row.person }}"
+                        data-id="{{ row.id }}"
                         hidden
                     >
+
                 </div>
 
                 <!-- УЧАСТИЕ -->
                 <div class="cell status
                     {% if row.status == '+' %}plus{% elif row.status == '-' %}minus{% endif %}
                 ">
-                    <span class="status-text">{{ row.status or '' }}</span>
-                    <select class="status-select" hidden>
+
+                    <span class="status-text">
+                        {{ row.status or '' }}
+                    </span>
+
+                    <select class="status-select" data-id="{{ row.id }}" hidden>
                         <option value="" {% if not row.status %}selected{% endif %}></option>
                         <option value="+" {% if row.status == '+' %}selected{% endif %}>+</option>
                         <option value="-" {% if row.status == '-' %}selected{% endif %}>-</option>
                     </select>
+
                 </div>
 
             </div>
+
         </div>
         {% endfor %}
 
@@ -76,9 +99,11 @@
     <!-- ДОБАВЛЕНИЕ -->
     <!-- ===================== -->
     <div class="add-form">
+
         <h2>Добавить участника</h2>
 
         <form method="post" action="/add">
+
             <input
                 type="text"
                 name="person"
@@ -93,7 +118,9 @@
             </select>
 
             <button type="submit">Добавить</button>
+
         </form>
+
     </div>
 
 </div>
