@@ -83,6 +83,41 @@ document.addEventListener("click", e => {
 
 
 // ==================================================
+// REQUEST HELPERS
+// ==================================================
+async function sendJson(url, payload) {
+
+    const response = await fetch(url, {
+
+        method: "POST",
+
+        headers: { "Content-Type": "application/json" },
+
+        body: JSON.stringify(payload)
+
+    })
+
+    const result = await response.json()
+
+    if (!response.ok || result.success === false) {
+
+        throw new Error(result.error || "Ошибка сохранения. Повторите операцию.")
+
+    }
+
+    return result
+
+}
+
+
+function showError(error) {
+
+    alert(error.message || "Ошибка сохранения. Повторите операцию.")
+
+}
+
+
+// ==================================================
 // MOVE UP / DOWN
 // ==================================================
 document.querySelectorAll(".move-up").forEach(btn => {
@@ -117,17 +152,17 @@ document.querySelectorAll(".move-down").forEach(btn => {
 
 async function move(id, direction) {
 
-    await fetch("/move", {
+    try {
 
-        method: "POST",
+        await sendJson("/move", { id, direction })
 
-        headers: { "Content-Type": "application/json" },
+        location.reload()
 
-        body: JSON.stringify({ id, direction })
+    } catch (error) {
 
-    })
+        showError(error)
 
-    location.reload()
+    }
 
 }
 
@@ -145,17 +180,17 @@ document.querySelectorAll(".delete").forEach(btn => {
 
         const card = btn.closest(".card")
 
-        await fetch("/delete", {
+        try {
 
-            method: "POST",
+            await sendJson("/delete", { id: card.dataset.id })
 
-            headers: { "Content-Type": "application/json" },
+            location.reload()
 
-            body: JSON.stringify({ id: card.dataset.id })
+        } catch (error) {
 
-        })
+            showError(error)
 
-        location.reload()
+        }
 
     })
 
@@ -180,9 +215,17 @@ document.querySelectorAll(".edit-record-btn").forEach(btn => {
 
         }
 
-        await saveEdit(card)
+        try {
 
-        location.reload()
+            await saveEdit(card)
+
+            location.reload()
+
+        } catch (error) {
+
+            showError(error)
+
+        }
 
     })
 
@@ -233,41 +276,13 @@ async function saveEdit(card) {
     const status = card.querySelector(".status-select").value || null
     const date = card.querySelector(".date-input").value
 
-    // обновляем ФИО
-    await fetch("/update-person", {
+    await sendJson("/update-record", {
 
-        method: "POST",
-
-        headers: { "Content-Type": "application/json" },
-
-        body: JSON.stringify({ id, person })
+        id,
+        person,
+        status,
+        date: card.dataset.canEditDate === "1" ? date : null
 
     })
-
-    // обновляем статус
-    await fetch("/update-status", {
-
-        method: "POST",
-
-        headers: { "Content-Type": "application/json" },
-
-        body: JSON.stringify({ id, status })
-
-    })
-
-    // обновляем дату
-    if (date && card.dataset.canEditDate === "1") {
-
-        await fetch("/update-date", {
-
-            method: "POST",
-
-            headers: { "Content-Type": "application/json" },
-
-            body: JSON.stringify({ id, date })
-
-        })
-
-    }
 
 }

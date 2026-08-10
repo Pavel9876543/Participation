@@ -13,6 +13,12 @@
 
     <h1>Список участия</h1>
 
+    {% if request.args.get('error') == 'db' %}
+    <div class="error-message">
+        Ошибка базы данных. Изменения не сохранены, повторите операцию.
+    </div>
+    {% endif %}
+
     <!-- ===================== -->
     <!-- СПИСОК -->
     <!-- ===================== -->
@@ -111,12 +117,6 @@
                 placeholder="Фамилия Имя"
                 required
             >
-
-            <select name="status">
-                <option value="">—</option>
-                <option value="+">+</option>
-                <option value="-">-</option>
-            </select>
 
             <button type="submit">Добавить</button>
 
