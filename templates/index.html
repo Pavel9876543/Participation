@@ -24,13 +24,14 @@
             data-id="{{ row.id }}"
             data-status="{{ row.status or '' }}"
             data-position="{{ row.position }}"
+            data-can-edit-date="{{ '1' if row.can_edit_date else '0' }}"
         >
 
             <!-- СКРЫТЫЕ ДЕЙСТВИЯ (SWIPE) -->
             <div class="card-actions">
                 <button class="delete" title="Удалить">🗑</button>
-                <button class="move-up" title="Вверх">⬆️</button>
-                <button class="move-down" title="Вниз">⬇️</button>
+                <button class="move-up" title="Вверх" {% if not row.without_status %}hidden{% endif %}>⬆️</button>
+                <button class="move-down" title="Вниз" {% if not row.without_status %}hidden{% endif %}>⬇️</button>
                 <button class="edit-record-btn" title="Редактировать">✏️</button>
             </div>
 

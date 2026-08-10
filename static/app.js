@@ -209,13 +209,15 @@ function enterEditMode(card) {
     card.querySelector(".status-text").hidden = true
     card.querySelector(".status-select").hidden = false
 
-    // дата (теперь всегда можно редактировать)
+    // дата редактируется только у базовой записи без статуса
     const dateText = card.querySelector(".date-text")
     const dateInput = card.querySelector(".date-input")
 
-    dateText.hidden = true
-    dateInput.hidden = false
-    dateInput.disabled = false
+    const canEditDate = card.dataset.canEditDate === "1"
+
+    dateText.hidden = canEditDate
+    dateInput.hidden = !canEditDate
+    dateInput.disabled = !canEditDate
 
 }
 
@@ -254,7 +256,7 @@ async function saveEdit(card) {
     })
 
     // обновляем дату
-    if (date) {
+    if (date && card.dataset.canEditDate === "1") {
 
         await fetch("/update-date", {
 

@@ -38,42 +38,93 @@ def init_db():
 init_db()
 
 
-# =====================================================
-# 🔥 ПРАВИЛЬНЫЙ ПЕРЕСЧЁТ
-# =====================================================
+def is_without_status(row):
+    return row["status"] not in ("+", "-")
 
-def recalc_chain(conn):
-    """
-    база = минимальная дата среди status IS NULL
-    остальные = +7 дней строго
-    """
-    cur = conn.cursor()
 
-    cur.execute("""
-        SELECT id, date
+def parse_date(value):
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def get_without_status_rows(conn):
+    return conn.execute("""
+        SELECT id, position, date, person, status
         FROM records
-        WHERE status IS NULL
-        ORDER BY position
-    """)
+        WHERE status IS NULL OR status = ''
+        ORDER BY position, id
+    """).fetchall()
 
-    normals = cur.fetchall()
 
-    if not normals:
+def get_base_without_status_row(conn):
+    rows = get_without_status_rows(conn)
+    return rows[0] if rows else None
+
+
+def recalc_without_status_dates(conn, base_date=None):
+    rows = get_without_status_rows(conn)
+
+    if not rows:
         return
 
-    # 🔥 база = самая ранняя дата
-    base_date = min(
-        datetime.strptime(r["date"], "%Y-%m-%d").date()
-        for r in normals
-    )
+    if base_date is None:
+        base_date = parse_date(rows[0]["date"])
 
-    # строгий пересчёт
-    for i, r in enumerate(normals):
-        new_date = base_date + timedelta(days=7 * i)
-
-        cur.execute(
+    for index, row in enumerate(rows):
+        new_date = base_date + timedelta(days=7 * index)
+        conn.execute(
             "UPDATE records SET date=? WHERE id=?",
-            (new_date.isoformat(), r["id"])
+            (new_date.isoformat(), row["id"])
+        )
+
+
+def normalize_positions(conn):
+    rows = conn.execute("""
+        SELECT id
+        FROM records
+        ORDER BY
+            CASE WHEN status IN ('+', '-') THEN 0 ELSE 1 END,
+            date ASC,
+            position ASC,
+            id ASC
+    """).fetchall()
+
+    for position, row in enumerate(rows):
+        conn.execute(
+            "UPDATE records SET position=? WHERE id=?",
+            (position, row["id"])
+        )
+
+
+def normalize_without_status_positions(conn):
+    status_rows = conn.execute("""
+        SELECT id
+        FROM records
+        WHERE status IN ('+', '-')
+        ORDER BY date ASC, position ASC, id ASC
+    """).fetchall()
+
+    without_status_rows = get_without_status_rows(conn)
+    ordered_rows = list(status_rows) + list(without_status_rows)
+
+    for position, row in enumerate(ordered_rows):
+        conn.execute(
+            "UPDATE records SET position=? WHERE id=?",
+            (position, row["id"])
+        )
+
+
+def cascade_without_status_after_removal(conn, removed_position, removed_date):
+    rows = get_without_status_rows(conn)
+
+    for row in rows:
+        if row["position"] < removed_position:
+            continue
+
+        steps = row["position"] - removed_position
+        new_date = removed_date + timedelta(days=7 * steps)
+        conn.execute(
+            "UPDATE records SET date=? WHERE id=?",
+            (new_date.isoformat(), row["id"])
         )
 
 
@@ -87,10 +138,17 @@ def index():
     conn = get_db()
     cur = conn.cursor()
 
+    base_row = get_base_without_status_row(conn)
+    base_id = base_row["id"] if base_row else None
+
     cur.execute("""
         SELECT id, position, date, person, status
         FROM records
-        ORDER BY position
+        ORDER BY
+            CASE WHEN status IN ('+', '-') THEN 0 ELSE 1 END,
+            date ASC,
+            position ASC,
+            id ASC
     """)
 
     rows = []
@@ -100,6 +158,8 @@ def index():
         r["date_fmt"] = datetime.strptime(
             r["date"], "%Y-%m-%d"
         ).strftime("%d.%m")
+        r["without_status"] = r["status"] not in ("+", "-")
+        r["can_edit_date"] = r["id"] == base_id
         rows.append(r)
 
     conn.close()
@@ -133,7 +193,10 @@ def add():
         VALUES (?, ?, ?, ?)
     """, (person, status, position, temp_date))
 
-    recalc_chain(conn)
+    if status is None:
+        recalc_without_status_dates(conn)
+
+    normalize_positions(conn)
 
     conn.commit()
     conn.close()
@@ -153,7 +216,7 @@ def delete():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT position FROM records WHERE id=?", (record_id,))
+    cur.execute("SELECT position, date, status FROM records WHERE id=?", (record_id,))
     row = cur.fetchone()
 
     if not row:
@@ -161,6 +224,8 @@ def delete():
         return jsonify(success=True)
 
     pos = row["position"]
+    removed_date = parse_date(row["date"])
+    without_status = is_without_status(row)
 
     cur.execute("DELETE FROM records WHERE id=?", (record_id,))
 
@@ -170,7 +235,10 @@ def delete():
         WHERE position>?
     """, (pos,))
 
-    recalc_chain(conn)
+    if without_status:
+        cascade_without_status_after_removal(conn, pos, removed_date)
+
+    normalize_positions(conn)
 
     conn.commit()
     conn.close()
@@ -191,27 +259,34 @@ def move():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, position FROM records WHERE id=?", (record_id,))
+    cur.execute("SELECT id, position, status FROM records WHERE id=?", (record_id,))
     row = cur.fetchone()
 
-    if not row:
+    if not row or not is_without_status(row):
         conn.close()
         return jsonify(success=True)
 
-    pos = row["position"]
-    neighbor_pos = pos - 1 if direction == "up" else pos + 1
+    rows = get_without_status_rows(conn)
+    row_index = next((i for i, item in enumerate(rows) if item["id"] == row["id"]), None)
 
-    cur.execute("SELECT id FROM records WHERE position=?", (neighbor_pos,))
-    nb = cur.fetchone()
-
-    if not nb:
+    if row_index is None:
         conn.close()
         return jsonify(success=True)
 
-    cur.execute("UPDATE records SET position=? WHERE id=?", (neighbor_pos, row["id"]))
-    cur.execute("UPDATE records SET position=? WHERE id=?", (pos, nb["id"]))
+    neighbor_index = row_index - 1 if direction == "up" else row_index + 1
 
-    recalc_chain(conn)
+    if neighbor_index < 0 or neighbor_index >= len(rows):
+        conn.close()
+        return jsonify(success=True)
+
+    base_date = parse_date(rows[0]["date"])
+    neighbor = rows[neighbor_index]
+
+    cur.execute("UPDATE records SET position=? WHERE id=?", (neighbor["position"], row["id"]))
+    cur.execute("UPDATE records SET position=? WHERE id=?", (row["position"], neighbor["id"]))
+
+    recalc_without_status_dates(conn, base_date)
+    normalize_without_status_positions(conn)
 
     conn.commit()
     conn.close()
@@ -255,13 +330,43 @@ def update_status():
         return jsonify(success=False)
 
     conn = get_db()
+    cur = conn.cursor()
 
-    conn.execute(
+    cur.execute("SELECT position, date, status FROM records WHERE id=?", (data["id"],))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify(success=False)
+
+    old_without_status = is_without_status(row)
+    new_without_status = status is None
+    removed_position = row["position"]
+    removed_date = parse_date(row["date"])
+
+    cur.execute(
         "UPDATE records SET status=? WHERE id=?",
         (status, data["id"])
     )
 
-    recalc_chain(conn)
+    if old_without_status and not new_without_status:
+        cur.execute("""
+            UPDATE records
+            SET position=position-1
+            WHERE position>?
+        """, (removed_position,))
+        cascade_without_status_after_removal(conn, removed_position, removed_date)
+    elif not old_without_status and new_without_status:
+        cur.execute("SELECT COALESCE(MAX(position), -1) + 1 FROM records")
+        cur.execute(
+            "UPDATE records SET position=? WHERE id=?",
+            (cur.fetchone()[0], data["id"])
+        )
+        recalc_without_status_dates(conn)
+    elif old_without_status and new_without_status:
+        recalc_without_status_dates(conn)
+
+    normalize_positions(conn)
 
     conn.commit()
     conn.close()
@@ -284,22 +389,26 @@ def update_date():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT status FROM records WHERE id=?", (record_id,))
+    cur.execute("SELECT id, status FROM records WHERE id=?", (record_id,))
     row = cur.fetchone()
 
     if not row:
         conn.close()
         return jsonify(success=False)
 
-    # обновляем ВСЕГДА (и +, и -, и NULL)
+    base_row = get_base_without_status_row(conn)
+
+    if not base_row or row["id"] != base_row["id"] or not is_without_status(row):
+        conn.close()
+        return jsonify(success=False)
+
     cur.execute(
         "UPDATE records SET date=? WHERE id=?",
         (new_date.isoformat(), record_id)
     )
 
-    # пересчитываем только если это NULL
-    if row["status"] is None:
-        recalc_chain(conn)
+    recalc_without_status_dates(conn, new_date)
+    normalize_positions(conn)
 
     conn.commit()
     conn.close()
