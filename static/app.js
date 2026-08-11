@@ -120,41 +120,94 @@ function showError(error) {
 // ==================================================
 // MOVE UP / DOWN
 // ==================================================
-document.querySelectorAll(".move-up").forEach(btn => {
+const LONG_PRESS_DELAY = 650
 
-    btn.addEventListener("click", async e => {
 
-        e.stopPropagation()
+setupMoveButton(".move-up", "up", "start")
+setupMoveButton(".move-down", "down", "end")
 
-        const card = btn.closest(".card")
 
-        await move(card.dataset.id, "up")
+function setupMoveButton(selector, direction, target) {
+
+    document.querySelectorAll(selector).forEach(btn => {
+
+        let longPressTimer = null
+        let longPressTriggered = false
+
+        btn.addEventListener("pointerdown", e => {
+
+            e.stopPropagation()
+
+            if (btn.dataset.moving === "1") return
+
+            longPressTriggered = false
+
+            longPressTimer = window.setTimeout(async () => {
+
+                longPressTriggered = true
+                btn.dataset.moving = "1"
+
+                try {
+
+                    const card = btn.closest(".card")
+
+                    await move(card.dataset.id, direction, target)
+
+                } finally {
+
+                    btn.dataset.moving = ""
+
+                }
+
+            }, LONG_PRESS_DELAY)
+
+        })
+
+        btn.addEventListener("pointerup", clearLongPressTimer)
+        btn.addEventListener("pointerleave", clearLongPressTimer)
+        btn.addEventListener("pointercancel", clearLongPressTimer)
+
+        btn.addEventListener("click", async e => {
+
+            e.stopPropagation()
+
+            if (longPressTriggered) {
+
+                e.preventDefault()
+                longPressTriggered = false
+                return
+
+            }
+
+            if (btn.dataset.moving === "1") return
+
+            const card = btn.closest(".card")
+
+            await move(card.dataset.id, direction)
+
+        })
+
+        function clearLongPressTimer() {
+
+            if (longPressTimer) {
+
+                window.clearTimeout(longPressTimer)
+                longPressTimer = null
+
+            }
+
+        }
 
     })
 
-})
+}
 
 
-document.querySelectorAll(".move-down").forEach(btn => {
-
-    btn.addEventListener("click", async e => {
-
-        e.stopPropagation()
-
-        const card = btn.closest(".card")
-
-        await move(card.dataset.id, "down")
-
-    })
-
-})
-
-
-async function move(id, direction) {
+async function move(id, direction, target = null) {
 
     try {
 
-        await sendJson("/move", { id, direction })
+        await sendJson("/move", { id, direction, target })
 
         location.reload()
 

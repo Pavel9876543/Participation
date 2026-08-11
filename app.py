@@ -258,6 +258,30 @@ def update_base_date_in_conn(conn, record_id, new_date):
     return True
 
 
+def move_without_status_to_target(conn, record_id, target):
+    rows = get_without_status_rows(conn)
+    row_index = next((i for i, row in enumerate(rows) if row["id"] == record_id), None)
+
+    if row_index is None:
+        return False
+
+    base_date = parse_date(rows[0]["date"])
+    ordered_ids = [row["id"] for row in rows]
+    moved_id = ordered_ids.pop(row_index)
+
+    if target == "start":
+        ordered_ids.insert(0, moved_id)
+    elif target == "end":
+        ordered_ids.append(moved_id)
+    else:
+        return False
+
+    apply_without_status_order(conn, ordered_ids)
+    recalc_without_status_dates(conn, base_date)
+    normalize_without_status_positions(conn)
+    return True
+
+
 # =====================================================
 # INDEX
 # =====================================================
@@ -391,6 +415,7 @@ def move():
 
     record_id = request.json.get("id")
     direction = request.json.get("direction")
+    target = request.json.get("target")
 
     try:
         with db_transaction() as conn:
@@ -406,6 +431,10 @@ def move():
             row_index = next((i for i, item in enumerate(rows) if item["id"] == row["id"]), None)
 
             if row_index is None:
+                return jsonify(success=True)
+
+            if target in ("start", "end"):
+                move_without_status_to_target(conn, row["id"], target)
                 return jsonify(success=True)
 
             neighbor_index = row_index - 1 if direction == "up" else row_index + 1
